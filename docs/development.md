@@ -7,7 +7,7 @@
 .\.venv\Scripts\python.exe scripts/audit_public.py
 ```
 
-测试覆盖邮件防重复发送、上传路径、HTTP 重定向、Table 授权及字段校验、Git 版本冲突、SSH 主机密钥和超时，以及六个 MCP 服务的工具发现。测试数据使用临时目录、模拟 HTTP 和本机 SSH 测试服务器。
+测试覆盖邮件防重复发送、上传路径、HTTP 重定向、Table 授权及字段校验、Git 版本冲突、SSH 主机密钥和超时，以及六个独立服务和合集模式的工具发现。合集模式还检查工具参数及读写注解与独立服务一致，并通过 HTTP 端点调用工具。测试数据使用临时目录、模拟 HTTP 和本机 SSH 测试服务器。
 
 复现 Windows/Python 3.13 依赖环境：
 
@@ -22,6 +22,7 @@
 | 路径 | 内容 |
 |---|---|
 | `manage.py` | 配置、检查和启动入口 |
+| `combined.py` | 合集 MCP 服务 |
 | `suite_common.py` | 数据目录、端口和凭据库辅助函数 |
 | `services/mail/` | IMAP/SMTP 与草稿 |
 | `services/workspace/` | Box WebDAV 与 Table API |

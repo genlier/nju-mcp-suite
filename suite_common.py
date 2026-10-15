@@ -4,7 +4,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 COMPONENTS = {'mail':'mail','box':'workspace','table':'workspace','table-account':'workspace',
               'git':'dev','tex':'dev','ssh':'ssh'}
-PORTS = {'mail':9785,'box':9787,'table':9788,'ssh':9789,'git':9790,'tex':9791}
+PORTS = {'all':9780,'mail':9785,'box':9787,'table':9788,'ssh':9789,'git':9790,'tex':9791}
 
 
 def state_dir(component):

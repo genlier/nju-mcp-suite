@@ -7,6 +7,10 @@ from suite_common import COMPONENTS, PORTS, REPO_ROOT, state_dir
 
 
 def launch(service, action, http=False):
+    if service == 'all':
+        from combined import make_server
+        make_server().run(transport='streamable-http' if http else 'stdio')
+        return
     component = COMPONENTS[service]
     folder = REPO_ROOT/'services'/component
     sys.path.insert(0, str(folder))
@@ -52,7 +56,7 @@ def main():
     commands = parser.add_subparsers(dest='action',required=True)
     for action in ('setup','check','serve','paths'):
         cmd = commands.add_parser(action)
-        cmd.add_argument('service',choices=COMPONENTS)
+        cmd.add_argument('service',choices=[*COMPONENTS,*(['all'] if action=='serve' else [])])
         if action=='serve':
             cmd.add_argument('--http',action='store_true')
     commands.add_parser('plugins')

@@ -1,6 +1,6 @@
 # NJU MCP Suite · 南大个人服务工具集
 
-将南大邮箱、Box、Table、Git、TeX 和自己的 SSH 电脑接入支持 MCP 的 AI 客户端。一个项目维护六个独立插件，按需安装。
+将南大邮箱、Box、Table、Git、TeX 和自己的 SSH 电脑接入支持 MCP 的 AI 客户端。安装一个合集插件，即可使用全部六项服务。
 
 运行环境：**Windows 10/11**。
 
@@ -151,7 +151,7 @@ TeX Git 默认直连。如需使用代理，在 `.local/dev/config.json` 顶层�
 
 远端命令面向 POSIX shell；SFTP 文件接口用于传输。当前版本使用密码认证。上传前运行 `manage.py paths ssh` 查看本机暂存目录，默认排他创建、不覆盖；单文件上限 20 MiB。命令单次最长 120 秒，超时后远端进程状态需另行核对。
 
-## 3. 在 Codex 桌面端安装插件
+## 3. 在 Codex 桌面端安装合集插件
 
 重新生成清单：
 
@@ -160,7 +160,15 @@ TeX Git 默认直连。如需使用代理，在 `.local/dev/config.json` 顶层�
 codex plugin marketplace add .\.local\marketplace
 ```
 
-按需安装：
+安装合集：
+
+```powershell
+codex plugin add nju-suite@nju-mcp-suite
+```
+
+合集插件自动启动一个 MCP 进程，提供六项服务的全部 33 个工具。服务凭据按第 2 节分别配置，客户端通过同一连接调用。
+
+如只需单项服务，也可以选择独立插件：
 
 ```powershell
 codex plugin add nju-mail@nju-mcp-suite
@@ -175,7 +183,7 @@ codex plugin add cloud-ssh@nju-mcp-suite
 
 移动项目或重建虚拟环境后，重新生成清单并更新本机插件。
 
-其他 MCP 客户端可从 `.local/client/mcp.json` 复制所需服务器条目，合并到客户端的 MCP 配置中。
+其他 MCP 客户端可将 `.local/client/mcp.json` 中的 `njuSuite` 条目合并到客户端配置中。单项服务配置位于 `.local/client/mcp-separate.json`。同一客户端选择合集或独立插件中的一种方式。
 
 可以这样发出指令：
 
@@ -192,11 +200,15 @@ codex plugin add cloud-ssh@nju-mcp-suite
 
 网页端通过远程 MCP 地址或隧道连接本机服务。
 
-以 Table 为例，先在本机终端运行：
+在本机终端运行以下命令，即可启动全部服务：
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py serve table --http
+.\.venv\Scripts\python.exe manage.py serve all --http
 ```
+
+统一 MCP 地址为 **`http://127.0.0.1:9780/mcp`**。将隧道或 MCP 网关指向这个地址，即可通过一个连接使用全部服务。
+
+需要单独启动某项服务时，将 `all` 换成服务名称，例如 `table`。各项服务的独立端点如下：
 
 | 服务 | 本机 HTTP 端点 |
 |---|---|
@@ -206,8 +218,6 @@ codex plugin add cloud-ssh@nju-mcp-suite
 | SSH | `http://127.0.0.1:9789/mcp` |
 | Git | `http://127.0.0.1:9790/mcp` |
 | TeX | `http://127.0.0.1:9791/mcp` |
-
-其他服务将命令中的 `table` 换成相应名称，每个 HTTP 服务使用单独终端保持运行。
 
 接入方式：
 
