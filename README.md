@@ -219,12 +219,55 @@ codex plugin add cloud-ssh@nju-mcp-suite
 | Git | `http://127.0.0.1:9790/mcp` |
 | TeX | `http://127.0.0.1:9791/mcp` |
 
-接入方式：
+### 把 Tunnel 指向本机合集服务
 
-- 有 Secure MCP Tunnel 权限时，按 [OpenAI 官方隧道文档](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)创建隧道，将 MCP server URL 指向对应本机端点，保持隧道客户端运行。
-- 自行部署时，使用具备 HTTPS 和身份验证的 MCP 网关，并让运行服务的系统具有自己的凭据配置。
+1. 保持上面的合集服务运行。
+2. 在 [OpenAI Platform 的 Tunnel 设置](https://platform.openai.com/settings/organization/tunnels)中创建或选择一个隧道，取得 **Tunnel ID** 和对应的运行 API key。将隧道关联到准备使用它的 ChatGPT 工作区。
+3. 从 [tunnel-client 官方发布页](https://github.com/openai/tunnel-client/releases/latest)下载 Windows 客户端，将 `tunnel-client.exe` 所在目录加入 PATH。
+4. 新开一个 PowerShell 窗口，连接隧道：
 
-在 ChatGPT 插件/应用设置里点击 **Add custom MCP server**，填写远程 MCP 地址或选择已连接的隧道。[官方接入说明](https://developers.openai.com/plugins/quickstart)
+```powershell
+$tunnelId = Read-Host 'Tunnel ID'
+$tunnelAlias = Read-Host '本机隧道别名（例如 nju-suite；复用时填原别名）'
+$tunnelKey = Read-Host '隧道运行 API key' -AsSecureString
+$env:CONTROL_PLANE_API_KEY = [System.Net.NetworkCredential]::new('', $tunnelKey).Password
+
+try {
+    tunnel-client runtimes connect `
+        --alias $tunnelAlias `
+        --tunnel-id $tunnelId `
+        --runtime-api-key env:CONTROL_PLANE_API_KEY `
+        --mcp-server-url http://127.0.0.1:9780/mcp `
+        --json
+
+    tunnel-client runtimes status $tunnelAlias --json
+} finally {
+    Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
+    Remove-Variable tunnelKey -ErrorAction SilentlyContinue
+}
+```
+
+**`--mcp-server-url http://127.0.0.1:9780/mcp` 就是设置本机指向地址的参数。** 命令会保存本机隧道配置并在后台启动客户端。检查状态中的 `process_running`、`healthy`、`ready`；三项应为 `true`。
+
+如果原来已经连接了单项服务，先列出隧道并停止原连接：
+
+```powershell
+tunnel-client runtimes list --json
+$tunnelAlias = Read-Host '要切换的原隧道别名'
+tunnel-client runtimes stop $tunnelAlias
+```
+
+再运行上面的连接命令，填写**原 Tunnel ID 和原别名**，将 `--mcp-server-url` 设置为合集地址，即可复用原隧道。以后更换本机服务地址，也按这个步骤重新连接。
+
+### 在 ChatGPT 网页端选择隧道
+
+打开 ChatGPT 的插件/应用设置 → **Add custom MCP server** → 连接方式选择 **Tunnel** → 选择刚连接的隧道，完成创建。已有应用复用原隧道时，刷新连接和工具列表。
+
+本机的 `127.0.0.1:9780/mcp` 填在隧道客户端的 `--mcp-server-url` 参数中；ChatGPT 页面选择对应的 Tunnel。保持本机合集服务和隧道客户端运行，即可使用全部 33 个工具。
+
+使用自建 HTTPS MCP 网关时，在 **Add custom MCP server** 中填写网关提供的远程 MCP 地址，并配置网关认证。
+
+参考：[Secure MCP Tunnel 官方说明](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)、[ChatGPT 自定义 MCP 接入](https://developers.openai.com/plugins/quickstart)。
 
 ## 5. 常见问题
 
