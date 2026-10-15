@@ -1,0 +1,6 @@
+mcp==1.30.0
+keyring==25.7.0
+httpx==0.28.1
+defusedxml==0.7.1
+filelock==3.32.7
+paramiko==4.0.0
