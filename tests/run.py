@@ -17,7 +17,7 @@ import httpx
 
 async def protocol(data):
     individual = {}
-    for service,count in {'mail':5,'box':5,'table':6,'git':5,'tex':5,'ssh':7,'all':33}.items():
+    for service,count in {'mail':5,'box':7,'table':13,'git':5,'tex':5,'ssh':7,'all':42}.items():
         params = StdioServerParameters(command=sys.executable,args=[str(ROOT/'manage.py'),'serve',service],
                                       cwd=str(ROOT),env={'NJU_MCP_DATA_DIR':data})
         async with stdio_client(params) as (read,write):
@@ -33,7 +33,7 @@ async def protocol(data):
                     for name in ('nju_box_status','nju_table_status','nju_git_status','nju_tex_status','cloud_ssh_status'):
                         assert not (await session.call_tool(name,{})).isError
                     assert (await session.call_tool('nju_mail_search',{'limit':0})).isError
-                    print('all: 33 tools, matching schemas and annotations, all service dispatch passed.')
+                    print('all: 42 tools, matching schemas and annotations, all service dispatch passed.')
                     continue
                 individual.update({t.name:t for t in tools})
                 name = 'nju_mail_search' if service=='mail' else 'cloud_ssh_status' if service=='ssh' else 'nju_'+service+'_status'
@@ -65,10 +65,10 @@ async def http_protocol(data):
         async with streamable_http_client('http://127.0.0.1:9780/mcp') as (read,write,_):
             async with ClientSession(read,write) as session:
                 await session.initialize()
-                assert len((await session.list_tools()).tools)==33
+                assert len((await session.list_tools()).tools)==42
                 assert not (await session.call_tool('nju_table_status',{})).isError
                 assert not (await session.call_tool('cloud_ssh_status',{})).isError
-        print('all HTTP: one endpoint, 33 tools and service calls passed.')
+        print('all HTTP: one endpoint, 42 tools and service calls passed.')
     finally:
         process.terminate()
         try:

@@ -41,8 +41,8 @@ def launch(service, action, http=False):
                     print(json.dumps({'alias':alias,**backend.tex_remote(alias)},ensure_ascii=False))
             return
     else:
-        if service == 'table-account':
-            raise ValueError('table-account 为配置方式；启动服务请使用 table。')
+        if service in ('table-account','table-session'):
+            raise ValueError(f'{service} 为配置方式；启动服务请使用 table。')
         file = folder/'server.py'
         arguments = [service] if component in ('workspace','dev') else []
         if http:

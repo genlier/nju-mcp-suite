@@ -7,8 +7,8 @@
 | 服务 | 功能 | 授权方式 |
 |---|---|---|
 | 南大邮箱 | 搜索邮件、读取正文、保存草稿、发送纯文本邮件 | 邮箱客户端专用密码 |
-| NJU Box | 目录浏览、文本读取、文件上传和下载 | WebDAV 用户名和专用密码 |
-| NJU Table | 列出可访问 Base、查结构、读行、新增及修改行 | 账户级 Token，兼容单 Base Token |
+| NJU Box | 目录浏览、文件读写、通过文件收集链接上传 | WebDAV 专用密码；收集链接直接访问 |
+| NJU Table | Base 读写、应用邀请链接、报名表读取与提交 | 账户级 Token、单 Base Token、网页会话 |
 | NJU Git | 列出加入的仓库、读文件、提交单文件修改 | GitLab 个人访问 Token |
 | NJU TeX | 读取、修改及推送任意有权限且开启同步的项目源码 | Git 同步令牌，兼容旧版密码认证 |
 | Cloud SSH | 执行命令、浏览目录、读文本、SFTP 上传下载 | SSH 密码及固定主机密钥 |
@@ -71,6 +71,8 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 -Python 'python3.13'
 
 命令显示实际 `uploads`、`downloads` 路径。将源文件复制到 `uploads`，再让客户端上传至完整的远端路径。覆盖已有文件时指定 `overwrite=true`。文本读取上限 1 MiB，单文件传输上限 20 MiB。
 
+收到 `https://box.nju.edu.cn/u/d/.../` 文件收集链接时，让客户端调用 `nju_box_upload_link_inspect` 查看收集目录，再调用 `nju_box_upload_link_upload(url, local_path)` 上传。文件同样放在上述 `uploads` 目录中。这条路径直接使用收集链接授权，返回服务器实际文件名、文件标识、大小和本地 SHA-256；同名文件由服务端另存。
+
 ### NJU Table：账户级授权
 
 推荐账户模式，可列出本人、群组和共享的 Base，按原有权限读写：
@@ -101,6 +103,50 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 -Python 'python3.13'
 ```
 
 为 Base 设置别名并隐藏输入 Token，之后通过 `alias` 访问。只读 Token 支持读取，读写 Token 支持新增和修改。写入字段使用元数据中的**列名称**；修改记录使用真实 `_id`。公式、系统列等只读字段由插件和服务器校验。
+
+### NJU Table：邀请链接与报名表
+
+把应用邀请链接 `/dtable/universal-app/links/...`、应用直达链接 `/external-apps/...` 或独立表单链接 `/dtable/forms/...` 交给客户端。插件直接使用 HTTP 接口，无需 Playwright；本机调用无需启动隧道。
+
+通用应用使用专属访问令牌，与 Base 授权分别处理。先保存网页登录会话：
+
+```powershell
+.\.venv\Scripts\python.exe manage.py setup table-session
+.\.venv\Scripts\python.exe manage.py check table-session
+```
+
+可以隐藏输入账号密码完成 HTTP 登录，也可以在浏览器完成验证码或单点登录后，选择导入该站点 Cookie 中的 `sessionid`。密码只用于当次登录，会话保存在 Windows 凭据库；过期后重新配置。公开独立表单可直接读取。
+
+使用顺序：
+
+1. `nju_table_open_link(url)`：读取页面、字段、必填项、选项、说明和默认值。
+2. 尚未加入应用时，按用户指令用 `nju_table_accept_invitation(url)` 接受邀请。
+3. `nju_table_form_prepare(url, page_id, values)`：用真实字段名或 key 填写，返回预览及 `draft_id`。锁定的姓名、学号按登录身份填入。仅填写部分资料时传 `allow_partial=true`，草稿列出缺项，补齐后再提交。
+4. `nju_table_form_submit(draft_id)`：按用户报名指令提交草稿，每份草稿只尝试一次。草稿与回执保存在 `.local/workspace/form-drafts/`。
+5. `nju_table_app_rows(url, page_id)`：读取当前账户可见的记录，核对报名结果。
+
+普通文本、长文本、数字、单选、多选、复选框、日期、邮箱和网址可填写。关联记录、附件以及条件显示字段通过网页填写。提交前会重新核对字段结构；连接中断后草稿保留待核对状态，先查看报名记录再决定后续操作。
+
+### NJU Table：创建收集表并发布填写链接
+
+使用账户级授权调用 `nju_table_create_collection`，即可新建独立 Base、配置字段并发布匿名填写链接。首个字段使用 `text`；其余支持文本、长文本、数字、日期、邮箱、网址、复选框、单选和多选。
+
+```json
+{
+  "name": "活动意见收集",
+  "request_id": "activity-feedback-20261026",
+  "description": "请填写你的活动意见。",
+  "fields": [
+    {"name": "称呼", "type": "text", "required": false},
+    {"name": "意见", "type": "long-text", "required": true},
+    {"name": "类别", "type": "single-select", "options": ["建议", "反馈"]}
+  ]
+}
+```
+
+默认创建在个人空间；指定其他有权限的工作区时传 `workspace_id`。返回的 `form_url` 可发给填写者，任何持链接者均可匿名提交，底层 Base 保留原有访问权限。创建后会用未登录 HTTP 请求核验填写页面。
+
+同一次操作固定 `request_id`，重复调用返回已保存的进度。发生中断时用 `nju_table_collection_status(request_id)` 查看已创建的 Base 和填写链接；记录保存在 `.local/workspace/collections/`。
 
 ### NJU Git
 
@@ -166,7 +212,7 @@ codex plugin marketplace add .\.local\marketplace
 codex plugin add nju-suite@nju-mcp-suite
 ```
 
-合集插件自动启动一个 MCP 进程，提供六项服务的全部 33 个工具。服务凭据按第 2 节分别配置，客户端通过同一连接调用。
+合集插件自动启动一个 MCP 进程，提供六项服务的全部 42 个工具。服务凭据按第 2 节分别配置，客户端通过同一连接调用。
 
 如只需单项服务，也可以选择独立插件：
 
@@ -263,7 +309,7 @@ tunnel-client runtimes stop $tunnelAlias
 
 打开 ChatGPT 的插件/应用设置 → **Add custom MCP server** → 连接方式选择 **Tunnel** → 选择刚连接的隧道，完成创建。已有应用复用原隧道时，刷新连接和工具列表。
 
-本机的 `127.0.0.1:9780/mcp` 填在隧道客户端的 `--mcp-server-url` 参数中；ChatGPT 页面选择对应的 Tunnel。保持本机合集服务和隧道客户端运行，即可使用全部 33 个工具。
+本机的 `127.0.0.1:9780/mcp` 填在隧道客户端的 `--mcp-server-url` 参数中；ChatGPT 页面选择对应的 Tunnel。保持本机合集服务和隧道客户端运行，即可使用全部 42 个工具。
 
 使用自建 HTTPS MCP 网关时，在 **Add custom MCP server** 中填写网关提供的远程 MCP 地址，并配置网关认证。
 

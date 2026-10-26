@@ -4,6 +4,7 @@ import json
 import re
 
 import keyring
+import httpx
 from keyring.backends.Windows import WinVaultKeyring
 
 from connections import ROOT, SERVICE, Box, Table, TableAccount, config
@@ -11,7 +12,7 @@ from connections import ROOT, SERVICE, Box, Table, TableAccount, config
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('service', choices=['box','table','table-account'])
+    parser.add_argument('service', choices=['box','table','table-account','table-session'])
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     if not isinstance(keyring.get_keyring(), WinVaultKeyring):
@@ -31,6 +32,45 @@ def main():
         keyring.set_password(SERVICE, 'box:' + username, password)
         cfg['box'] = {'username':username}
         print('Box 登录成功，根目录项目数：', result['total'])
+    elif args.service == 'table-session':
+        from links import TABLE_URL, page_get, table_cookies
+        if args.check:
+            with httpx.Client(timeout=30, cookies=table_cookies()) as client:
+                result = client.get(TABLE_URL + '/api/v2.1/auth-token-by-session/')
+            if result.status_code != 200 or not result.json().get('token'):
+                raise ValueError('Table 网页会话已失效，请重新配置。')
+            print('Table 网页会话有效。')
+            return
+        print('网页登录：1 = 账户密码登录；2 = 导入浏览器 sessionid。会话保存在 Windows 凭据库。')
+        mode = input('选择方式（回车为 1）：').strip() or '1'
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            _, html = page_get(client, TABLE_URL + '/accounts/login/', 'table.nju.edu.cn')
+            if mode == '1':
+                username = input('统一身份认证账号：').strip()
+                password = getpass.getpass('密码（隐藏输入，不保存）：')
+                csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html)
+                if not csrf or not username or not password:
+                    raise ValueError('登录字段不完整。')
+                response = client.post(TABLE_URL + '/accounts/login/',
+                                       data={'login':username,'password':password,'csrfmiddlewaretoken':csrf.group(1)},
+                                       headers={'Referer':TABLE_URL + '/accounts/login/'})
+                if response.status_code not in (200,302,303):
+                    raise ValueError(f'网页登录失败：HTTP {response.status_code}。')
+            elif mode == '2':
+                session = getpass.getpass('浏览器 sessionid（隐藏输入）：').strip()
+                if not session or len(session) > 4096 or any(ord(ch)<33 for ch in session):
+                    raise ValueError('sessionid 无效。')
+                client.cookies.set('sessionid', session, domain='table.nju.edu.cn', path='/')
+            else:
+                raise ValueError('请选择 1 或 2。')
+            response = client.get(TABLE_URL + '/api/v2.1/auth-token-by-session/')
+            if response.status_code != 200 or not response.json().get('token'):
+                raise ValueError('登录尚未完成。若需要验证码或单点登录，请在浏览器完成后使用方式 2。')
+            cookies = [{'name':c.name,'value':c.value,'domain':c.domain,'path':c.path}
+                       for c in client.cookies.jar if c.domain.lstrip('.') == 'table.nju.edu.cn']
+            keyring.set_password(SERVICE,'table-web-session',json.dumps(cookies))
+        print('Table 网页会话已保存。')
+        return
     elif args.service == 'table-account':
         if args.check:
             result = TableAccount().list_bases(limit=1)

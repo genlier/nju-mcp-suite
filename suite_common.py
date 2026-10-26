@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
-COMPONENTS = {'mail':'mail','box':'workspace','table':'workspace','table-account':'workspace',
+COMPONENTS = {'mail':'mail','box':'workspace','table':'workspace','table-account':'workspace','table-session':'workspace',
               'git':'dev','tex':'dev','ssh':'ssh'}
 PORTS = {'all':9780,'mail':9785,'box':9787,'table':9788,'ssh':9789,'git':9790,'tex':9791}
 

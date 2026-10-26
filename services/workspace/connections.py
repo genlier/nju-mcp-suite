@@ -58,7 +58,7 @@ def json_request(method, url, **kwargs):
         result = json.loads(data)
     except (ValueError, UnicodeError):
         raise ValueError('服务器未返回 JSON，请检查接口地址和部署版本。') from None
-    if isinstance(result, dict) and (result.get('success') is False or result.get('error_message')):
+    if isinstance(result, dict) and (result.get('success') is False or result.get('error_message') or result.get('error_msg')):
         raise ValueError('服务器返回操作失败，请核对表名、行 ID、字段类型及权限。')
     return result
 
